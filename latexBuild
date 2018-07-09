@@ -1,0 +1,59 @@
+#!/bin/bash
+
+LAST=""
+UPLOAD="KO"
+UP_DIR=""
+TEX=""
+PDF=""
+FLAG=""
+ONCE=""
+
+for PARAM in $@
+do
+	case $PARAM in
+		-h|--help)
+			echo display this window
+			exit
+			;;
+		-o)
+			ONCE="y"
+			;;
+		-gu)
+			UPLOAD="OK"
+			LAST="google_upload"
+			;;
+		*)
+			case $LAST in
+				google_upload)
+					if [ "$UP_DIR" != "" ]; then
+						echo $UP_DIR will be replaced by $PARAM
+						echo $PARAM wil be the next google drive upload directory
+					fi
+					UP_DIR=$PARAM
+					;;
+				*)
+					echo unknow param $PARAM
+					;;
+			esac
+			;;
+	esac
+done
+
+TEX=$(find . -name *.tex)
+
+for DOC in $TEX
+do
+	echo $DOC
+	PDF=$( echo $DOC | rev | cut -d '.' -f 2- | rev ).pdf
+	FLAG=$( [ "$(grep minted $DOC)" != "" ] && echo "-shell-escape" || echo "" )
+	[ "$ONCE" == "y" ] && \
+		pdflatex $FLAG $DOC && \
+        [ "$UPLOAD" == "OK" ] && \
+        google_upload $PDF $UP_DIR
+	[ "$ONCE" == "" ] && \
+		pdflatex $FLAG $DOC && \
+		pdflatex $FLAG $DOC && \
+		[ "$UPLOAD" == "OK" ] && \
+		google_upload $PDF $UP_DIR
+done
+
