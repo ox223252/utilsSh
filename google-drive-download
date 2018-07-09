@@ -1,0 +1,39 @@
+#!/bin/bash
+
+usage ()
+{
+
+
+	echo "The script can be used to download file from google drive."
+	echo "Usage:"
+	echo "$0 [ options ] <filesID>"
+	echo ""
+	echo "to get file ID, on google drie page: right click on file, \"get shareable link\" select the link and store the part after equal symbol, it's the file ID" 
+	echo "options:"
+	echo "-q | --quiet - silence all output"
+	echo "-h | --help - display this window"
+	exit;
+}
+
+while [ "$1" != "" ]; do
+	case "$1" in
+		-q | --quiet )  QUIET=true; shift ;;
+		-h | --help ) usage; shift ;;
+		-- ) shift; break ;;
+		* )	if [ "$URI" == "" ]; then
+				URI="$1";
+			else
+				URI="$URI,$1";
+			fi
+			shift ;;
+
+	esac
+done
+
+[ "$URI" == "" ] && exit 1
+
+if [ "$QUIET" == "true" ]; then
+	curl --remote-name-all -J -L https://drive.google.com/uc?id={$URI} 2>&1 1>/dev/null
+else
+	curl --remote-name-all -J -L https://drive.google.com/uc?id={$URI}
+fi
