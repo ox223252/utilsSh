@@ -1,0 +1,74 @@
+#!/bin/bash
+
+SRC=.
+MASK=
+list=false
+type="l"
+
+# parse arguments
+for arg in $@
+do
+        case $arg in
+                -h)
+                        echo "usage $0 [-s SRC]"
+                        ;;
+		-l)
+			list=true
+			;;
+                -*)
+                        last=$arg
+                        ;;
+                *)
+                        case $last in
+                                -s)
+                                        SRC=$arg
+                                        ;;
+				-m)
+					if [ "$MASK" != "" ]; then
+						MASK="$MASK|($arg)"
+					else
+						MASK="($arg)"
+					fi
+					;;
+				-t)
+					type=$arg
+					;;
+                        esac
+                        ;;
+        esac
+done
+
+if [ "$MASK" == "" ]; then
+	MASK="(.)"
+fi
+
+[ "$type" == "l" ] || [ "$type" == "w" ] || [ "$type" == "c" ] || type="l";
+
+files=$(find $SRC | grep -E $MASK)
+
+if [ $list == true ]; then
+	echo $files
+	exit 0
+fi
+
+count=0
+for file in $files
+do
+	if [ -d $file ]; then
+		continue
+	fi
+	count=$(( count + $(cat $file | wc -$type) ))
+	echo $count : $file
+done
+
+case $type in
+	l)
+		echo -e "\e[1;33m$count\e[0m \e[33mlines\e[0m found in $SRC direcotry"
+		;;
+	w)
+		echo -e "\e[1;33m$count\e[0m \e[33mwords\e[0m found in $SRC direcotry"
+		;;
+	c)
+		echo -e "\e[1;33m$count\e[0m \e[33mbytes\e[0m found in $SRC direcotry"
+		;;
+esac
