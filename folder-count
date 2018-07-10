@@ -4,16 +4,40 @@ SRC=.
 MASK=
 list=false
 type="l"
+verbose=false
+quiet=false
+
+usage()
+{
+	echo "usage $0 [-s SRC] [-v] [-q] [-t (l|w|c)] [-l] [-m \"regex\"]"
+	echo ""
+	echo "    -s SRC : src of start parsing"
+	echo "    -v : verbose boolean"
+	echo "    -q : quiet boolean (hide error)"
+	echo "    -t (l|w|c): count type line/word/char"
+	echo "    -l : list file boolean"
+	echo "    -m regex : mask of file accepted"
+	echo ""
+	echo "ex : $0 -s . -m \"\.[ch)]$\" -q"
+	exit 0
+}
+
 
 # parse arguments
 for arg in $@
 do
         case $arg in
                 -h)
-                        echo "usage $0 [-s SRC]"
+			usage
                         ;;
 		-l)
 			list=true
+			;;
+		-v)
+			verbose=true
+			;;
+		-q)
+			quiet=true
 			;;
                 -*)
                         last=$arg
@@ -44,7 +68,7 @@ fi
 
 [ "$type" == "l" ] || [ "$type" == "w" ] || [ "$type" == "c" ] || type="l";
 
-files=$(find $SRC | grep -E $MASK)
+files=$(find $SRC | grep -E "$MASK")
 
 if [ $list == true ]; then
 	echo $files
@@ -57,8 +81,16 @@ do
 	if [ -d $file ]; then
 		continue
 	fi
-	count=$(( count + $(cat $file | wc -$type) ))
-	echo $count : $file
+
+	if [ $quiet == true ]; then
+		count=$(( count + $(cat $file 2> /dev/null | wc -$type ) ))
+	else
+		count=$(( count + $(cat $file | wc -$type) ))
+	fi
+
+	if [ $verbose == true ]; then
+		echo $count : $file
+	fi
 done
 
 case $type in
