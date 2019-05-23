@@ -1,0 +1,132 @@
+#!/bin/bash
+
+DATE=$(date +%Y-%m-%d_%H-%M-%S)
+NEW=false
+SCP_SET=false
+NAME=$DATE
+
+# server who need backup
+INPUTS=()
+
+# backup folder
+OUTPUT=~/backup
+
+# you should configure server name in .ssh/config and set a keyfile for auto connection
+SERVERS=( )
+
+# one target folder name for each serverName available
+SCP_OUT=( )
+
+LISTE=( )
+
+function usage ()
+{
+	echo "$0"
+	echo "v1.0"
+	echo "GPLv2"
+	echo ""
+	echo "-h | this windows"
+	echo "-i | inputs folders"
+	echo "-n | to create new integrale save"
+	echo "-o | output folder (on the host machine)"
+	echo "-s | ssh servers"
+	echo "-so| ssh servers outputs (default server:~/backup)"
+	echo ""
+	echo "to use corectly ssh mode, define to provide an automatic connection on server"
+	echo "exemple: $0 -i ~/tmp -s server1 server2 -so '~/backupFolder'"
+	exit 0
+}
+
+for arg in $@
+do
+	case $arg in
+		-h)
+			usage
+			;;
+		-i|-so|-o)
+			last=$arg
+			;;
+		-n)
+			last=$arg
+			NEW=true
+			NAME=$DATE-NEW
+			;;
+		-s)
+			SCP_SET=true
+			last=$arg
+			;;
+		*)
+			case $last in
+				-n)
+					NAME=$DATE-$arg
+					;;
+				-i)
+					INPUTS+=" $arg"
+					;;
+				-o)
+					OUTPUT=$arg
+					;;
+				-s)
+					SERVERS+=" $arg"
+					;;
+				-so)
+					SCP_OUT+=" $arg"
+					;;
+			esac
+			;;
+	esac
+done
+
+for INPUT in ${INPUTS[@]}
+do
+	[ $SCP_SET == true ] && mkdir -p $OUTPUT/$INPUT
+
+	if [ $NEW == true ]; then
+		[ -f $OUTPUT/$INPUT/files.list ] && echo -e "\n\n# NEW $DATE\n" >> $OUTPUT/$INPUT/files.old.list
+		[ -f $OUTPUT/$INPUT/files.list ] && cat $OUTPUT/$INPUT/files.list >> $OUTPUT/$INPUT/files.old.list
+		[ -f $OUTPUT/$INPUT/files.list ] && rm $OUTPUT/$INPUT/files.list
+
+		[ -f $OUTPUT/$INPUT/error.txt ] && echo -e "\n\n# NEW $DATE\n" >> $OUTPUT/$INPUT/error.old.txt 
+		[ -f $OUTPUT/$INPUT/error.txt ] && cat $OUTPUT/$INPUT/error.txt  >> $OUTPUT/$INPUT/error.old.txt 
+		[ -f $OUTPUT/$INPUT/error.txt ] && rm $OUTPUT/$INPUT/error.txt
+
+		[ -f $OUTPUT/$INPUT/log.txt ] && echo -e "\n\n# NEW $DATE\n" >> $OUTPUT/$INPUT/log.old.txt
+		[ -f $OUTPUT/$INPUT/log.txt ] && cat $OUTPUT/$INPUT/log.txt >> $OUTPUT/$INPUT/log.old.txt
+		[ -f $OUTPUT/$INPUT/log.txt ] && rm $OUTPUT/$INPUT/log.txt
+	fi
+
+	echo $DATE >> $OUTPUT/$INPUT/log.txt
+	echo $DATE >> $OUTPUT/$INPUT/error.txt
+
+	NAME=$INPUT/backup-$(hostname)-$NAME.tar.gz
+
+	tar -zcvf $OUTPUT/$NAME -g $OUTPUT/$INPUT/files.list --exclude $INPUT/backup* $INPUT 2>> $OUTPUT/$INPUT/error.txt 1>> $OUTPUT/$INPUT/log.txt
+
+	[ $SCP_SET == true ] && LISTE+=" $NAME"
+done
+
+if [ $SCP_SET == true ]; then
+	for INPUT in ${INPUTS[@]}
+	do
+		for ID in ${!SERVERS[*]}
+		do
+			[ "${SCP_OUT[$ID]}" != "" ] && \
+				ssh ${SERVERS[$ID]} mkdir -p "${SCP_OUT[$ID]}"/$INPUT ||\
+				ssh ${SERVERS[$ID]} mkdir -p '~/backup'/$INPUT
+		done
+
+		LISTE+=" $INPUT/files.list"
+		LISTE+=" $INPUT/log.txt"
+		LISTE+=" $INPUT/error.txt"
+	done
+
+	for ITEM in ${LISTE[@]}
+	do
+		for ID in ${!SERVERS[*]}
+		do
+			[ "${SCP_OUT[$ID]}" != "" ] && \
+				scp $OUTPUT/$ITEM ${SERVERS[$ID]}:"${SCP_OUT[$ID]}"/$INPUT ||\
+				scp $OUTPUT/$ITEM ${SERVERS[$ID]}:'~/backup'/$INPUT
+		done
+	done
+fi
