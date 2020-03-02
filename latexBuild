@@ -11,6 +11,9 @@ ONCE=""
 for PARAM in $@
 do
 	case $PARAM in
+		-f)
+			LAST="file"
+			;;
 		-h|--help)
 			echo display this window
 			exit
@@ -31,6 +34,9 @@ do
 					fi
 					UP_DIR=$PARAM
 					;;
+				file)
+					TEX="$TEX $PARAM"
+					;;
 				*)
 					echo unknow param $PARAM
 					;;
@@ -39,7 +45,9 @@ do
 	esac
 done
 
-TEX=$(find . -name *.tex)
+if [ "$TEX" == "" ]; then
+	TEX=$(find . | grep -E "*.tex$")
+fi
 
 for DOC in $TEX
 do
