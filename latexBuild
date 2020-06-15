@@ -18,9 +18,6 @@ do
 			echo display this window
 			exit
 			;;
-		-o)
-			ONCE="y"
-			;;
 		-gu)
 			UPLOAD="OK"
 			LAST="google_upload"
@@ -53,15 +50,36 @@ for DOC in $TEX
 do
 	echo $DOC
 	PDF=$( echo $DOC | rev | cut -d '.' -f 2- | rev ).pdf
+	AUX=$( echo $DOC | rev | cut -d'.' -f 2- | rev ).aux
 	FLAG=$( [ "$(grep minted $DOC)" != "" ] && echo "-shell-escape" || echo "" )
-	[ "$ONCE" == "y" ] && \
-		pdflatex $FLAG $DOC && \
-        [ "$UPLOAD" == "OK" ] && \
-        google_upload $PDF $UP_DIR
-	[ "$ONCE" == "" ] && \
-		pdflatex $FLAG $DOC && \
-		pdflatex $FLAG $DOC && \
-		[ "$UPLOAD" == "OK" ] && \
-		google_upload $PDF $UP_DIR
+
+	# first compilation
+	pdflatex $FLAG $DOC
+	RET_1=$?
+	
+	# generate the bib element if needed
+	if [ "$RET_1" == 0 ];
+	then
+		bibtex $AUX
+		RET_2=$?
+	fi
+	
+	# second compilation if no bib or first if bib exist
+	if [ "$RET_1" == 0 ];
+	then
+		pdflatex $FLAG $DOC
+		RET=$?
+	fi
+	
+	# second compilation if bib exist
+	if [ "$RET" == 0 ] && [ "$RET_2" != "" ] && [ "$RET_2" == 0 ];
+	then
+		pdflatex $FLAG $DOC
+		RET=$?
+	fi
+
+	[ "$RET" == 0 ] && echo -e "\e[1;32mall done perfectly\e[0m"
+
+	[ "$RET" == 0 ] && [ "$UPLOAD" == "OK" ] && google_upload $PDF $UP_DIR
 done
 
