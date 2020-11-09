@@ -1,0 +1,91 @@
+#!/bin/bash
+
+JLINK="00:22:c7:07:17:a2"
+
+
+__DB="$HOME/.getIPFromMac"
+__SAVE=""
+__VERBOSE=""
+__MAC=""
+__ID=""
+
+usage ( )
+{
+	echo "$0 -m xx:xx:xx:xx:xx:xx [-s NAME] [-d path/file] [-v]"
+	echo "    to get IP from provided MAC"
+	echo "$0 NAME [-d path/file] [-v]"
+	echo "    to get an IP through a MAC found in database file"
+	echo ""
+	echo "-d|--database   save file for saved mac"
+	echo "-h|--help       this windows"
+	echo "-m|--mac        mac searched"
+	echo "-s|--save       save ID and mac in database file"
+	echo "-v|--verbose    verbose mode"
+}
+
+for arg in $@
+do
+	case $arg in
+		-h|--help)
+			usage $0
+			;;
+		-v|--verbose)
+			__VERBOSE="true"
+			;;
+		-m|--mac|-s|--save|-d|--database)
+			last=$arg;
+			;;
+		*)
+			case $last in
+				-m|--mac)
+					__MAC=$arg
+					;;
+				-s|--save)
+					__SAVE=$arg
+					;;
+				-d|--database)
+					__DB=$arg
+					;;
+				*)
+					__ID=$arg
+			esac
+			last=""
+			;;
+	esac
+done
+
+if [ "$__MAC" == "" ] && [ "$__DB" != "" ] && [ -f "$__DB" ]; then
+	if [ "$__VERBOSE" == "true" ]; then
+		echo "$__DB contain"
+		echo "--------------------------------------------------"
+		cat $__DB
+		echo "--------------------------------------------------"
+		printf "\nget IP from %s " $__ID
+	fi
+
+	__MAC=$( cat $__DB | grep -E "^$__ID=" | cut -d"=" -f2 )
+	
+	if [ "$__VERBOSE" == "true" ]; then
+		printf "from --%s--\n" $__MAC
+	fi
+fi
+
+if [ "$__MAC" != "" ]; then
+	if [ "$__VERBOSE" == "true" ]; then
+		echo "get ip from $__MAC"
+		printf "IP is: "
+	fi
+
+	__IP=$(arp -a | grep "$__MAC" | cut -d" " -f2 | cut -d"(" -f2 | cut -d")" -f1)
+	
+	echo $__IP
+
+	if [ "$__SAVE" != "" ] && [ "$__DB" != "" ] && [ -f "$__DB" ]; then
+		if [ "$__VERBOSE" == "true" ]; then
+			echo "Save $__SAVE=$__MAC in $__DB"
+		fi
+
+		cat $__DB | grep -vE "^$__SAVE=" > $__DB
+		printf "$__SAVE=$__MAC\n" >> "$__DB"
+	fi
+fi
