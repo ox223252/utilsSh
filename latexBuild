@@ -56,27 +56,27 @@ do
 	FLAG=$( [ "$(grep minted $DOC)" != "" ] && echo "-shell-escape" || echo "" )
 
 	# first compilation
-	latex $FLAG $DOC 1>/dev/null
+	latex $FLAG $DOC
 	RET_1=$?
 	
 	# generate the bib element if needed
 	if [ "$RET_1" == 0 ];
 	then
-		bibtex $AUX 1>/dev/null
+		bibtex $AUX
 		RET_2=$?
 	fi
 	
 	# second compilation if no bib or first if bib exist
 	if [ "$RET_1" == 0 ];
 	then
-		latex $FLAG $DOC 1>/dev/null
+		latex $FLAG $DOC
 		RET=$?
 	fi
 	
 	# second compilation if bib exist
 	if [ "$RET" == 0 ] && [ "$RET_2" == 0 ];
 	then
-		latex $FLAG $DOC 1>/dev/null
+		latex $FLAG $DOC
 		RET=$?
 	fi
 
