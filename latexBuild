@@ -6,7 +6,6 @@ UP_DIR=""
 TEX=""
 PDF=""
 FLAG=""
-ONCE=""
 
 for PARAM in $@
 do
@@ -49,32 +48,43 @@ fi
 for DOC in $TEX
 do
 	echo $DOC
-	PDF=$( echo $DOC | rev | cut -d '.' -f 2- | rev ).pdf
-	AUX=$( echo $DOC | rev | cut -d'.' -f 2- | rev ).aux
+	BASE=$( echo $DOC | rev | cut -d '.' -f 2- | rev )
+	PS=$BASE".ps"
+	PDF=$BASE".pdf"
+	DVI=$BASE".dvi"
+	AUX=$BASE".aux"
 	FLAG=$( [ "$(grep minted $DOC)" != "" ] && echo "-shell-escape" || echo "" )
 
 	# first compilation
-	pdflatex $FLAG $DOC
+	latex $FLAG $DOC 1>/dev/null
 	RET_1=$?
 	
 	# generate the bib element if needed
 	if [ "$RET_1" == 0 ];
 	then
-		bibtex $AUX
+		bibtex $AUX 1>/dev/null
 		RET_2=$?
 	fi
 	
 	# second compilation if no bib or first if bib exist
 	if [ "$RET_1" == 0 ];
 	then
-		pdflatex $FLAG $DOC
+		latex $FLAG $DOC 1>/dev/null
 		RET=$?
 	fi
 	
 	# second compilation if bib exist
-	if [ "$RET" == 0 ] && [ "$RET_2" != "" ] && [ "$RET_2" == 0 ];
+	if [ "$RET" == 0 ] && [ "$RET_2" == 0 ];
 	then
-		pdflatex $FLAG $DOC
+		latex $FLAG $DOC 1>/dev/null
+		RET=$?
+	fi
+
+	# second compilation if bib exist
+	if [ "$RET" == 0 ] && [ -f $DVI ];
+	then
+		dvips $DVI -o $PS
+		ps2pdf $PS $PDF
 		RET=$?
 	fi
 
