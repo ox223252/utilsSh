@@ -95,7 +95,9 @@ if [ "$__MAC" != "" ]; then
 			echo "Save $__SAVE=$__MAC in $__DB"
 		fi
 
-		cat $__DB | grep -vE "^$__SAVE=" > $__DB
+		grep -vE "^$__SAVE=" $__DB > $__DB.tmp
+		rm $__DB
+		mv $__DB.tmp $__DB
 		printf "$__SAVE=$__MAC\n" >> "$__DB"
 	fi
 fi
