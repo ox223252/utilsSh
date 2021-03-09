@@ -8,6 +8,7 @@ __SAVE=""
 __VERBOSE=""
 __MAC=""
 __ID=""
+__PING=""
 
 usage ( )
 {
@@ -21,6 +22,8 @@ usage ( )
 	echo "-m|--mac        mac searched"
 	echo "-s|--save       save ID and mac in database file"
 	echo "-v|--verbose    verbose mode"
+	echo "-p|--ping       execute a broadcasted ping"
+	echo "                 -p netAddr/mask"
 }
 
 for arg in $@
@@ -32,7 +35,7 @@ do
 		-v|--verbose)
 			__VERBOSE="true"
 			;;
-		-m|--mac|-s|--save|-d|--database)
+		-m|--mac|-s|--save|-d|--database|-p|--ping)
 			last=$arg;
 			;;
 		*)
@@ -45,6 +48,9 @@ do
 					;;
 				-d|--database)
 					__DB=$arg
+					;;
+				-p|--ping)
+					__PING=$arg
 					;;
 				*)
 					__ID=$arg
@@ -64,13 +70,17 @@ if [ "$__MAC" == "" ] && [ "$__DB" != "" ] && [ -f "$__DB" ]; then
 	fi
 
 	__MAC=$( cat $__DB | grep -E "^$__ID=" | cut -d"=" -f2 )
-	
-	if [ "$__VERBOSE" == "true" ]; then
-		printf "from --%s--\n" $__MAC
-	fi
 fi
 
 if [ "$__MAC" != "" ]; then
+	__MAC=$(echo $__MAC | tr '[:upper:]' '[:lower:]')
+	echo $__MAC
+
+	if [ "$__PING" != "" ]; then
+		# need to get netIP from interface
+		nmap -sP $__PING
+	fi
+
 	if [ "$__VERBOSE" == "true" ]; then
 		echo "get ip from $__MAC"
 		printf "IP is: "
