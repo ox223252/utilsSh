@@ -87,8 +87,43 @@ if [ "$__MAC" != "" ]; then
 	fi
 
 	__IP=$(arp -a | grep "$__MAC" | cut -d" " -f2 | cut -d"(" -f2 | cut -d")" -f1)
-	
-	echo $__IP
+
+	if [ "$__VERBOSE" == "true" ]; then
+		echo $__IP
+	fi
+
+	if [ "$__IP" == "" ]; then
+		__MASKS=() # nb de bit du mask
+		__IPS=() # ip du reseau
+		while read line
+		do
+			mask=$(echo $line | cut -d" " -f4)
+			count=0
+			for m in $( echo $mask | cut -d"." -f1- --output-delimiter " " )
+			do
+				while [ "$m" != "0" ];
+				do
+					count=$(( $count + $(( $m % 2 )) ))
+					m=$(( $m / 2 ))
+				done
+			done
+			__MASKS+=($count)
+
+			ip=$(echo $line | cut -d" " -f2)
+			IFS=. read -r i1 i2 i3 i4 <<< $ip
+			IFS=. read -r m1 m2 m3 m4 <<< $mask
+
+			__IPS+=($(echo "$((i1 & m1)).$((i2 & m2)).$((i3 & m3)).$((i4 & m4))"))
+		done <<< $(ifconfig | grep "inet " | sed -r 's/\s+/ /g' | sed -r 's/^\s//g' | grep -v " 127")
+
+		echo "IP for the ping mode"
+		for i in ${!__IPS[@]}
+		do
+			echo "${__IPS[$i]}/${__MASKS[$i]}"
+		done
+		exit 1
+	fi
+
 
 	if [ "$__SAVE" != "" ] && [ "$__DB" != "" ] && [ -f "$__DB" ]; then
 		if [ "$__VERBOSE" == "true" ]; then
