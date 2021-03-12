@@ -1,5 +1,6 @@
 #!/bin/bash
 
+BUILD="latex"
 LAST=""
 UPLOAD="KO"
 UP_DIR=""
@@ -17,6 +18,12 @@ do
 			echo display this window
 			exit
 			;;
+		-b)
+			LAST="build"
+			;;
+		-fb)
+			LAST="fullBuild"
+			;;
 		-gu)
 			UPLOAD="OK"
 			LAST="google_upload"
@@ -33,6 +40,12 @@ do
 				file)
 					TEX="$TEX $PARAM"
 					;;
+				build)
+					BUILD=$PARAM$BUILD
+					;;
+				fullBuild)
+					BUILD=$PARAM
+					;;
 				*)
 					echo unknow param $PARAM
 					;;
@@ -40,6 +53,8 @@ do
 			;;
 	esac
 done
+
+echo "$BUILD" ; sleep 1
 
 if [ "$TEX" == "" ]; then
 	TEX=$(find . | grep -E "*.tex$")
@@ -56,27 +71,27 @@ do
 	FLAG=$( [ "$(grep minted $DOC)" != "" ] && echo "-shell-escape" || echo "" )
 
 	# first compilation
-	latex $FLAG $DOC
+	$BUILD $FLAG $DOC
 	RET_1=$?
-	
+
 	# generate the bib element if needed
 	if [ "$RET_1" == 0 ];
 	then
 		bibtex $AUX
 		RET_2=$?
 	fi
-	
+
 	# second compilation if no bib or first if bib exist
 	if [ "$RET_1" == 0 ];
 	then
-		latex $FLAG $DOC
+		$BUILD $FLAG $DOC
 		RET=$?
 	fi
-	
+
 	# second compilation if bib exist
 	if [ "$RET" == 0 ] && [ "$RET_2" == 0 ];
 	then
-		latex $FLAG $DOC
+		$BUILD $FLAG $DOC
 		RET=$?
 	fi
 
