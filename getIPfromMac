@@ -66,7 +66,6 @@ if [ "$__MAC" == "" ] && [ "$__DB" != "" ] && [ -f "$__DB" ]; then
 		echo "--------------------------------------------------"
 		cat $__DB
 		echo "--------------------------------------------------"
-		printf "\nget IP from %s " $__ID
 	fi
 
 	__MAC=$( cat $__DB | grep -E "^$__ID=" | cut -d"=" -f2 )
@@ -88,9 +87,7 @@ if [ "$__MAC" != "" ]; then
 
 	__IP=$(arp -a | grep "$__MAC" | cut -d" " -f2 | cut -d"(" -f2 | cut -d")" -f1)
 
-	if [ "$__VERBOSE" == "true" ]; then
-		echo $__IP
-	fi
+	echo $__IP
 
 	if [ "$__IP" == "" ]; then
 		__MASKS=() # nb de bit du mask
