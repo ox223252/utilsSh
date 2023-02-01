@@ -1,0 +1,145 @@
+#!/bin/bash
+
+VERSION="1.0"
+APPNAME=""
+APPGENERIC=""
+PREFIX="/opt"
+COMMENT=""
+KEYWORDS=() # IDE;textEditor
+CATEGORIES=() # java;C;
+MIME=() # text/html;text/ino;
+
+create()
+{
+	echo "[Desktop Entry]" > ${APPNAME}.desktop
+	echo "Version=${VERSION}" >> ${APPNAME}.desktop
+	echo "Name=${APPNAME}" >> ${APPNAME}.desktop
+	echo "" >> ${APPNAME}.desktop
+	echo "Exec=${APPNAME}" >> ${APPNAME}.desktop
+	echo "Terminal=false" >> ${APPNAME}.desktop
+	echo "X-MultipleArgs=false" >> ${APPNAME}.desktop
+	echo "Type=Application" >> ${APPNAME}.desktop
+
+	if [ "${COMMENT}" != "" ];
+	then
+		echo "Comment=${COMMENT[@]}" >> ${APPNAME}.desktop
+	fi
+
+	if [ "${APPGENERIC}" != "" ];
+	then
+		echo "GenericName=${APPGENERIC}" >> ${APPNAME}.desktop
+	fi
+
+	if [ "${KEYWORDS}" != "" ];
+	then
+		STR=""
+		for K in ${KEYWORDS[@]};
+		do
+			STR+="${K};"
+		done
+		echo "Keywords=${STR}" >> ${APPNAME}.desktop
+	fi
+
+	if [ "${MIME}" != "" ];
+	then
+		STR=""
+		for K in ${MIME[@]};
+		do
+			STR+="${K};"
+		done
+		echo "MimeType=${STR}" >> ${APPNAME}.desktop
+	fi
+
+	if [ "${CATEGORIES}" != "" ];
+	then
+		STR=""
+		for K in ${CATEGORIES[@]};
+		do
+			STR+="${K};"
+		done
+		echo "Categories=${STR}" >> ${APPNAME}.desktop
+	fi
+
+	echo "Icon=${PREFIX}/${APPNAME}.png" >> ${APPNAME}.desktop
+
+	echo "StartupNotify=true" >> ${APPNAME}.desktop
+
+# Actions=new-window;new-private-window;
+# printf("
+# [Desktop Action new-window]
+# Name=Open a New Window
+# Exec=firefox -new-window
+# ");
+}
+
+install()
+{
+	s=""
+
+	if [ "$(id -u)" != "0" ]
+	then
+	        s=sudo
+	fi
+
+	$s mv ${APPNAME}.desktop ${PREFIX}/${APPNAME}.desktop
+	$s ln -s ${PREFIX}/${APPNAME}.desktop /usr/share/applications/
+}
+
+INSTALL=false
+
+for arg in $@
+do
+	case $arg in
+		-v|-n|-g|-p|-C|-k|-c|-m)
+			lastArgs=$arg
+			;;
+		-i)
+			INSTALL=true
+			;;
+		*)
+
+			case $lastArgs in
+				-v)
+					VERSION=$arg
+					lastArgs=""
+					;;
+				-n)
+					APPNAME=$arg
+					lastArgs=""
+					;;
+				-g)
+					APPGENERIC=$arg
+					lastArgs=""
+					;;
+				-p)
+					PREFIX=$arg
+					lastArgs=""
+					;;
+				-C)
+					COMMENT+=" $arg"
+					;;
+				-k)
+					KEYWORDS+=" $arg"
+					;;
+				-c)
+					CATEGORIES+=" $arg"
+					;;
+				-m)
+					MIME+=" $arg"
+					;;
+				*)
+					lastArgs=""
+					;;
+			esac
+			;;
+	esac
+done
+
+create
+
+cat ${APPNAME}.desktop
+
+if [ $INSTALL == true ];
+then
+	install
+fi
