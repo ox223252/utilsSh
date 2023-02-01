@@ -1,0 +1,275 @@
+#!/bin/bash
+
+DEVICE=sdc
+IMG=/home/psauleau/iso/2022-09-22-raspios-bullseye-armhf-lite.img
+RSA=(
+	/home/psauleau/.ssh/RSA/clients/id_rsa.banc.pub
+	/home/psauleau/.ssh/RSA/other/id_rsa.DB.Rasp.Fhsonic.pub
+)
+HOST_NAME=test
+
+# hotspot
+WIFI_SSID=""
+WIFI_PASS=""
+
+#new user
+USER_NAME="bob"
+USER_PASS="pass"
+
+OFF_BUTTON=14
+
+NODE="no"
+NODE_VERSION="16"
+
+e=""
+
+E="\e[31m" # error
+N="\e[0m" # neutral
+
+
+function usage ()
+{
+	echo "$0"
+	echo "------------------------------------------"
+	echo "scritp use to install new raspberry pi iso"
+	echo " image with somme preconfig"
+	echo "------------------------------------------"
+	echo ""
+	echo "usage : $0 [ -h ] \\"
+	echo "    [ -i /path/to/image/file ] \\"
+	echo "    [ -d /pas/to/device ] \\"
+	echo "    [ -k /pasth/to/key1 [ /pasth/to/key2 [...]]] \\"
+	echo "    [ -n [ -nV version ]] \\"
+	echo "    [ -hN hostname ] \\"
+	echo "    [ -wS SSID -wP PASS ] \\"
+	echo "    [ -uN NAME ] \\"
+	echo "    [ -uP PASS ]"
+	echo ""
+	echo "------------------------------------------"
+	echo ""
+	echo "h  | this windows"
+	echo "i  | input iso file         | ${IMG}"
+	echo "d  | device output          | ${DEVICE}"
+	echo "k  | add RSA keys           | nb : ${#RSA[@]}"
+	echo "n  | add nodeJs             | ${NODE}"
+	echo "nV | nodeJs version         | ${NODE_VERSION}"
+	echo "hN | hostname               | ${HOST_NAME}"
+	echo "wS | hotspot wifi SSID      | ${WIFI_SSID}"
+	echo "wP | hotspot wifi PASS      | ${WIFI_PASS}"
+	echo "uN | user NAME              | ${USER_NAME}"
+	echo "uP | user PASS              | ${USER_PASS}"
+	echo "oB | off button gpio number | ${OFF_BUTTON}"
+
+	exit 0
+}
+
+# parsing args
+for arg in $@
+do
+	case $arg in
+		-h)
+			usage
+			;;
+		-i|-d|-k|-hN|-wS|-wP|-uN|-uP|-nV)
+			last=$arg
+			;;
+		-t)
+			set -v
+			;;
+		-n)
+			NODE="y"
+			;;
+		*)
+			case $last in
+				-i)
+					IMG=$arg
+					last=""
+					;;
+				-d)
+					DEVICE=$arg
+					last=""
+					;;
+				-k)
+					RSA+= $arg
+					;;
+				-hN)
+					HOST_NAME=$arg
+					last=""
+					;;
+				-wS)
+					WIFI_SSID=$arg
+					last=""
+					;;
+				-wP)
+					WIFI_PASS=$arg
+					last=""
+					;;
+				-uN)
+					USER_NAME=$arg
+					last=""
+					;;
+				-uP)
+					USER_PASS=$arg
+					last=""
+					;;
+				-nV)
+					NODE_VERSION=$arg
+					last=""
+					;;
+			esac
+			;;
+	esac
+done
+
+
+if [ "${DEVICE}" == "" ] || [ "${DEVICE}" == "/" ]; then
+	echo -e "${E}error${N} : device invalid"
+	exit 2
+fi
+
+
+${e} umount /dev/${DEVICE}* 2>/dev/null
+
+echo "DD --> $(ls -lh ${IMG} | cut -d' ' -f5)"
+${e} dd if=${IMG} of=/dev/${DEVICE} bs=4M status=progress
+if [ $? -ne 0 ]; then
+	echo -e "${E}error${N} : not done"
+	exit 0
+fi
+sync
+
+if [ $? -ne 0 ]; then
+	echo exit
+	exit
+fi
+
+${e} mkdir -p tmp
+
+echo "BOOT"
+${e} mount /dev/${DEVICE}1 tmp
+
+# start ssh
+echo "- add ssh"
+${e} touch tmp/ssh
+
+# add wifi
+echo "- add wifi"
+${e} cp res/wpa_supplicant.conf tmp/
+
+if [ "${OFF_BUTTON}" != "" ]; then
+	# add power off button
+	echo "- add power off button"
+	${e} echo "dtoverlay=gpio-shutdown,gpio_pin=${OFF_BUTTON},active_low=1,gpio_pull=up,debounce=200" >> tmp/config.txt
+fi
+
+if [ "${USER_NAME}" != "" ] && [ "${USER_PASS}" != "" ]; then
+	# add newUser
+	# https://www.raspberrypi.com/documentation/computers/configuration.html#configuring-a-user
+	echo "- create user"
+	${e} echo "${USER_NAME}:$(openssl passwd -6 ${USER_PASS})" > tmp/userconf.txt
+	cat tmp/userconf.txt
+fi
+
+sync ; sleep 1
+echo "DONE"
+${e} umount tmp
+
+
+
+echo "ROOTFS"
+${e} mount /dev/${DEVICE}2 tmp
+
+# create start script
+echo "- start script"
+${e} echo "#!/bin/sh" > tmp/root/startScript.sh
+${e} chmod +x tmp/root/startScript.sh
+${e} echo "ping 1.1.1.1 -c 1"  >> tmp/root/startScript.sh
+${e} echo "[ $? != 0 ] && exit 0" >> tmp/root/startScript.sh
+${e} echo "sudo apt update" >> tmp/root/startScript.sh
+${e} echo "sudo apt upgrade" >> tmp/root/startScript.sh
+
+# add network config
+echo "- network"
+${e} cp res/sshd_config tmp/etc/ssh/
+${e} cp res/wlan0.cfg tmp/etc/network/interfaces.d/
+${e} cp res/eth0.cfg tmp/etc/network/interfaces.d/
+
+# ssh keys
+echo "- ssh keys"
+${e} mkdir -p tmp/root/.ssh/RSA/server/
+
+if [ ! -f tmp/root/.ssh/authorized_keys ]; then
+	${e} touch tmp/root/.ssh/authorized_keys
+fi
+
+for KEY in ${RSA[@]}
+do
+	echo "  - ${KEY}"
+	${e} cp ${KEY} tmp/root/.ssh/RSA/server/
+	${e} echo "# ${KEY}" >> tmp/root/.ssh/authorized_keys
+	${e} cat ${KEY} >> tmp/root/.ssh/authorized_keys
+done
+${e} echo "cp -r /root/.ssh /home/${USER_NAME}/" >> tmp/root/startScript.sh
+
+# change hostname
+echo "- host name"
+${e} echo "${HOST_NAME}" > tmp/etc/hostname
+${e} echo "127.0.0.1 ${HOST_NAME}" >> tmp/etc/hosts
+
+# add hotspot if no network
+if [ "WIFI_PASS" != "" ] && [ "WIFI_SSID" != "" ]; then
+	echo "- hotspot"
+	if [ ${#WIFI_PASS} -lt 8 ]; then
+		echo -e "${E}merror${N} : WIFI pass length must be 8-32"
+	fi
+	echo "- add update on boot"
+	${e} echo "apt -y install hostapd dnsmasq" >> tmp/root/startScript.sh
+	${e} echo "systemctl unmask hostapd" >> tmp/root/startScript.sh
+	${e} echo "systemctl disable hostapd" >> tmp/root/startScript.sh
+	${e} echo "systemctl disable dnsmasq" >> tmp/root/startScript.sh
+	
+	echo "- hostapd conf"
+	${e} mkdir -p tmp/etc/hostapd/
+	${e} cp res/hostapd.conf tmp/etc/hostapd/
+	${e} echo "ssid=${WIFI_SSID}" >> tmp/etc/hostapd/hostapd.conf
+	${e} echo "wpa_passphrase=${WIFI_PASS}" >> tmp/etc/hostapd/hostapd.conf
+	
+	${e} cp res/dnsmasq.conf tmp/root/
+	${e} echo "mv /root/dnsmasq.conf /etc/" >> tmp/root/startScript.sh
+
+	${e} echo "nohook wpa_supplicant" >> tmp/etc/dhcpcd.conf
+	
+	# add and enable auto hotspot service
+	echo "- hotspot service"
+	${e} cp res/autohotspot.service tmp/etc/systemd/system/
+	${e} echo "systemctl enable autohotspot.service" >> tmp/root/startScript.sh
+	
+	${e} cp res/autohotspot.sh tmp/usr/bin/
+	${e} chmod +x tmp/usr/bin/autohotspot.sh
+fi
+
+if [ "${NODE}" == "y" ]; then
+	echo "- nodejs ${NODE_VERSION}"
+	${e} echo "apt install curl" >> tmp/root/startScript.sh
+	${e} echo "curl -sL https://deb.nodesource.com/setup_${NODE_VERSION}.x | sudo bash -" >> tmp/root/startScript.sh
+	${e} echo "apt install nodejs" >> tmp/root/startScript.sh
+fi
+
+echo "- add clean start script"
+${e} echo "rm \$0" >> tmp/root/startScript.sh
+
+echo "- rc.local"
+${e} cat tmp/etc/rc.local | grep -v -E "^exit 0$" > tmp/etc/rc.local2
+${e} mv tmp/etc/rc.local2 tmp/etc/rc.local
+${e} chmod +x tmp/etc/rc.local
+${e} echo "[ -f /root/startScript.sh ] && /root/startScript.sh" >> tmp/etc/rc.local
+${e} echo "exit 0" >> tmp/etc/rc.local
+
+sync ; sleep 1
+echo "DONE"
+${e} umount tmp
+
+echo "accessible on "
+echo "ssh ${USER_NAME}@${HOST_NAME}.local -i $(echo ${RSA[0]} | rev | cut -d'.' -f2- | rev)"
+
+exit 0
