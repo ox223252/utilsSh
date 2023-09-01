@@ -62,6 +62,14 @@ fi
 
 for DOC in $TEX
 do
+	for img in $(find . | grep -E "\.png$")
+	do
+		out="$(echo $img | rev | cut -d'.' -f2- | rev).eps"
+		echo "- $img / $out"
+		[ ! -e $out ] && convert $img eps2:$out
+		mv $img $img-back
+	done
+
 	echo $DOC
 	BASE=$( echo $DOC | rev | cut -d '.' -f 2- | rev )
 	PS=$BASE".ps"
@@ -73,6 +81,7 @@ do
 	# first compilation
 	$BUILD $FLAG $DOC
 	RET_1=$?
+
 
 	# generate the bib element if needed
 	if [ "$RET_1" == 0 ];
