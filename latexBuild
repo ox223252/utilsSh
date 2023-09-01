@@ -62,12 +62,11 @@ fi
 
 for DOC in $TEX
 do
-	for img in $(find . | grep -E "\.png$")
+	for img in $(find . | grep -E "\.(png|jpg|jpeg|bmp)$")
 	do
 		out="$(echo $img | rev | cut -d'.' -f2- | rev).eps"
-		echo "- $img / $out"
+		printf "%-30s -> %s\n" $img	$out
 		[ ! -e $out ] && convert $img eps2:$out
-		mv $img $img-back
 	done
 
 	echo $DOC
